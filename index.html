@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Centre of mass — where have you been?</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <h1>Life's centre of mass</h1>
+        <p>
+          Where is your centre? Pin places on the map by click or search. 
+        </p>
+        <p>
+          Reveal the time-weighted centre of mass of your life so far.
+        </p>
+      </div>
+      <div class="mode-actions">
+        <button id="btn-done" class="btn-secondary" type="button">
+          Reveal centre of mass
+        </button>
+        <button id="btn-add-more" class="btn-ghost" type="button" hidden>
+          Add additional points?
+        </button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel">
+        <div class="panel-header">
+          <h2>Your places</h2>
+          <p>
+            Search or click the map to add.
+          </p>
+        </div>
+
+        <form class="entry-form" id="add-form" autocomplete="off">
+          <div class="field search-wrap">
+            <label for="place-query">Place name</label>
+            <input
+              id="place-query"
+              name="query"
+              placeholder="e.g. Cambridge, UK"
+              required
+            />
+            <div id="suggestions" class="suggestions" role="listbox"></div>
+          </div>
+          <div class="years">
+            <div class="field">
+              <label for="start-month">Start</label>
+              <input id="start-month" name="start" type="month" required />
+            </div>
+            <div class="field">
+              <label for="end-month">End</label>
+              <input id="end-month" name="end" type="month" required />
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn-primary" type="submit">Add from search</button>
+          </div>
+          <div id="form-status" class="status" aria-live="polite"></div>
+        </form>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Start</th>
+                <th>End</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="places-body"></tbody>
+          </table>
+        </div>
+
+        <div class="panel-footer">
+          <button id="btn-export" class="btn-ghost" type="button">Download JSON</button>
+          <button id="btn-clear" class="btn-danger-solid" type="button">Clear all points</button>
+        </div>
+      </aside>
+
+      <section class="stage edit-mode" id="stage">
+        <div class="stage-badge" id="stage-badge">Map — click to add a place</div>
+        <div id="map"></div>
+        <aside class="com-card" id="com-card" hidden>
+          <p class="com-kicker">Centre of mass</p>
+          <h2 id="com-settlement">Add places to find yours</h2>
+          <p id="com-coords" class="com-coords"></p>
+          <p id="com-spread" class="com-spread"></p>
+          <p id="com-meta" class="com-meta"></p>
+        </aside>
+      </section>
+    </main>
+
+    <div class="modal-backdrop" id="click-modal" role="dialog" aria-modal="true">
+      <div class="modal">
+        <h3 id="modal-title">Add this place</h3>
+        <p id="click-coords">Click somewhere on the map.</p>
+        <form id="click-form">
+          <div class="field">
+            <label for="click-name">Name</label>
+            <input id="click-name" required />
+          </div>
+          <div class="years">
+            <div class="field">
+              <label for="click-start">Start</label>
+              <input id="click-start" type="month" required />
+            </div>
+            <div class="field">
+              <label for="click-end">End</label>
+              <input id="click-end" type="month" required />
+            </div>
+          </div>
+          <div class="field" id="move-field" hidden>
+            <label for="click-move">Move to (optional search)</label>
+            <input id="click-move" placeholder="Leave blank to keep location" />
+            <div id="move-suggestions" class="suggestions" role="listbox"></div>
+          </div>
+          <div class="modal-actions modal-actions-spread">
+            <button type="button" class="btn-danger" id="click-delete" hidden>Delete</button>
+            <div class="modal-actions">
+              <button type="button" class="btn-ghost" id="click-cancel">Cancel</button>
+              <button type="submit" class="btn-primary" id="click-submit">Add place</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>

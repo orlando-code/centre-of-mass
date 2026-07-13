@@ -840,7 +840,7 @@ els.btnDone.addEventListener("click", () => setMode("view"));
 els.btnAddMore.addEventListener("click", () => setMode("edit"));
 
 els.btnLink.addEventListener("click", () => {
-  window.open("https://orlando-code.github.io/centre-of-mass/", "_blank");
+  window.open("https://github.com/orlando-code/centre-of-mass", "_blank");
 });
 
 els.btnExport.addEventListener("click", () => {

@@ -56,6 +56,7 @@ const els = {
   btnAddMore: $("btn-add-more"),
   btnExport: $("btn-export"),
   btnClear: $("btn-clear"),
+  btnLink: $("btn-link"),
   modal: $("click-modal"),
   modalTitle: $("modal-title"),
   clickForm: $("click-form"),
@@ -837,6 +838,10 @@ els.body.addEventListener("click", (e) => {
 
 els.btnDone.addEventListener("click", () => setMode("view"));
 els.btnAddMore.addEventListener("click", () => setMode("edit"));
+
+els.btnLink.addEventListener("click", () => {
+  window.open("https://github.com/rt582/centre-of-mass", "_blank");
+});
 
 els.btnExport.addEventListener("click", () => {
   const blob = new Blob([JSON.stringify(places, null, 2)], {

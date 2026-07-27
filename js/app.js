@@ -1,12 +1,14 @@
 import { searchPlaces, reverseGeocode } from "./geocode.js";
 import {
   angularCircle,
+  clampDurationParts,
   computeCentreOfMass,
   formatDuration,
   formatPlaceDuration,
   formatSpread,
   normalizePlace,
   validatePlaceDuration,
+  WHEEL_MAX,
 } from "./com.js";
 
 const STORAGE_KEY = "com-places-v4";
@@ -15,7 +17,7 @@ const MODE_KEY = "com-mode-v1";
 const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 const MAX_ZOOM = 10;
 
-/** @typedef {{ id: string, name: string, lat: number, lng: number, amount: number, unit: "days"|"months"|"years" }} Place */
+/** @typedef {{ id: string, name: string, lat: number, lng: number, years: number, months: number, days: number }} Place */
 /** @typedef {{ name: string, lat: number, lng: number, label: string }} GeoHit */
 
 /** @type {Place[]} */
@@ -48,8 +50,7 @@ const els = {
   body: $("places-body"),
   form: $("add-form"),
   query: $("place-query"),
-  amount: $("duration-amount"),
-  unit: $("duration-unit"),
+  durationWheels: $("duration-wheels"),
   suggestions: $("suggestions"),
   status: $("form-status"),
   btnDone: $("btn-done"),
@@ -61,8 +62,7 @@ const els = {
   modalTitle: $("modal-title"),
   clickForm: $("click-form"),
   clickName: $("click-name"),
-  clickAmount: $("click-amount"),
-  clickUnit: $("click-unit"),
+  clickDurationWheels: $("click-duration-wheels"),
   clickCoords: $("click-coords"),
   clickCancel: $("click-cancel"),
   clickDelete: $("click-delete"),
@@ -101,10 +101,75 @@ function updateRevealButton() {
   els.btnDone.disabled = places.length === 0;
 }
 
-function resetDurationDefaults(amountEl, unitEl) {
-  amountEl.value = "1";
-  unitEl.value = "months";
+/* ---------- Duration wheels ---------- */
+function fillWheelOptions(select, max) {
+  select.innerHTML = "";
+  for (let i = 0; i <= max; i++) {
+    const opt = document.createElement("option");
+    opt.value = String(i);
+    opt.textContent = String(i);
+    select.appendChild(opt);
+  }
 }
+
+function createDurationWheels(container, idPrefix) {
+  container.innerHTML = "";
+  /** @type {Record<"years"|"months"|"days", HTMLSelectElement>} */
+  const selects = {};
+
+  for (const [part, label] of [
+    ["years", "years"],
+    ["months", "months"],
+    ["days", "days"],
+  ]) {
+    const col = document.createElement("div");
+    col.className = "wheel-col";
+
+    const select = document.createElement("select");
+    select.className = "duration-wheel";
+    select.id = `${idPrefix}-${part}`;
+    select.size = 5;
+    select.setAttribute("aria-label", label);
+    fillWheelOptions(select, WHEEL_MAX[part]);
+    select.value = "0";
+
+    const caption = document.createElement("span");
+    caption.textContent = label;
+
+    col.append(select, caption);
+    container.appendChild(col);
+    selects[part] = select;
+  }
+
+  return {
+    get() {
+      return clampDurationParts({
+        years: selects.years.value,
+        months: selects.months.value,
+        days: selects.days.value,
+      });
+    },
+    set(parts) {
+      const next = clampDurationParts(parts);
+      selects.years.value = String(next.years);
+      selects.months.value = String(next.months);
+      selects.days.value = String(next.days);
+      for (const sel of Object.values(selects)) {
+        const opt = sel.selectedOptions[0];
+        opt?.scrollIntoView({ block: "center" });
+      }
+    },
+    reset() {
+      this.set({ years: 0, months: 0, days: 0 });
+    },
+    setDisabled(disabled) {
+      for (const sel of Object.values(selects)) sel.disabled = disabled;
+    },
+  };
+}
+
+const formWheels = createDurationWheels(els.durationWheels, "duration");
+const modalWheels = createDurationWheels(els.clickDurationWheels, "click-duration");
 
 /* ---------- Autocomplete ---------- */
 function createAutocomplete(input, listEl, onPick) {
@@ -227,14 +292,7 @@ function renderTable() {
         <button type="button" class="place-select" data-action="select">${escapeAttr(place.name)}</button>
       </td>
       <td class="duration-cell">
-        <div class="duration-edit">
-          <input data-field="amount" type="number" min="0.1" step="any" value="${escapeAttr(place.amount)}" aria-label="Duration amount" />
-          <select data-field="unit" aria-label="Duration unit">
-            <option value="days"${place.unit === "days" ? " selected" : ""}>days</option>
-            <option value="months"${place.unit === "months" ? " selected" : ""}>months</option>
-            <option value="years"${place.unit === "years" ? " selected" : ""}>years</option>
-          </select>
-        </div>
+        <button type="button" class="place-select" data-action="edit">${escapeAttr(formatPlaceDuration(place))}</button>
       </td>
       <td class="actions-cell">
         <button type="button" class="btn-icon-remove" data-action="delete" title="Remove ${escapeAttr(place.name)}" aria-label="Remove ${escapeAttr(place.name)}">×</button>
@@ -263,13 +321,13 @@ function selectPlace(id, { openEditor = false } = {}) {
 }
 
 function addPlace(partial) {
+  const parts = clampDurationParts(partial);
   const place = {
     id: uid(),
     name: String(partial.name).trim(),
     lat: Number(partial.lat),
     lng: Number(partial.lng),
-    amount: Number(partial.amount),
-    unit: partial.unit,
+    ...parts,
   };
   if (!place.name || Number.isNaN(place.lat) || Number.isNaN(place.lng)) {
     setStatus("Need a valid place with coordinates.", true);
@@ -298,8 +356,11 @@ function updatePlace(id, partial) {
       partial.name != null
         ? String(partial.name).trim() || place.name
         : place.name,
-    amount: partial.amount != null ? Number(partial.amount) : place.amount,
-    unit: partial.unit ?? place.unit,
+    ...clampDurationParts({
+      years: partial.years ?? place.years,
+      months: partial.months ?? place.months,
+      days: partial.days ?? place.days,
+    }),
     lat: partial.lat != null ? Number(partial.lat) : place.lat,
     lng: partial.lng != null ? Number(partial.lng) : place.lng,
   };
@@ -494,9 +555,10 @@ function setMode(next) {
   els.badge.hidden = isView;
   updateRevealButton();
 
-  els.form.querySelectorAll("input, select, button[type=submit]").forEach((el) => {
+  els.form.querySelectorAll("input, button[type=submit]").forEach((el) => {
     el.disabled = isView;
   });
+  formWheels.setDisabled(isView);
 
   applyProjection();
   upsertMapMarkers();
@@ -641,7 +703,7 @@ function openAddModal(lat, lng) {
   els.moveField.hidden = true;
   els.clickMove.value = "";
   moveAc.hide();
-  resetDurationDefaults(els.clickAmount, els.clickUnit);
+  modalWheels.reset();
   els.clickName.value = "";
   els.clickCoords.textContent = `Resolving ${lat.toFixed(3)}, ${lng.toFixed(3)}…`;
   els.modal.classList.add("open");
@@ -672,8 +734,7 @@ function openEditModal(place) {
   els.clickMove.value = "";
   moveAc.hide();
   els.clickName.value = place.name;
-  els.clickAmount.value = String(place.amount);
-  els.clickUnit.value = place.unit;
+  modalWheels.set(place);
   els.clickCoords.textContent = `${place.name} (${place.lat.toFixed(3)}, ${place.lng.toFixed(3)})`;
   els.modal.classList.add("open");
   renderTable();
@@ -693,6 +754,7 @@ els.clickDelete.addEventListener("click", () => {
 
 els.clickForm.addEventListener("submit", async (e) => {
   e.preventDefault();
+  const duration = modalWheels.get();
 
   if (modalMode === "add") {
     if (!pendingClick) return;
@@ -701,8 +763,7 @@ els.clickForm.addEventListener("submit", async (e) => {
         name: els.clickName.value,
         lat: pendingClick.lat,
         lng: pendingClick.lng,
-        amount: els.clickAmount.value,
-        unit: els.clickUnit.value,
+        ...duration,
       })
     ) {
       closeModal();
@@ -738,8 +799,7 @@ els.clickForm.addEventListener("submit", async (e) => {
   if (
     updatePlace(selectedId, {
       name: els.clickName.value,
-      amount: els.clickAmount.value,
-      unit: els.clickUnit.value,
+      ...duration,
       lat,
       lng,
     })
@@ -769,43 +829,17 @@ els.form.addEventListener("submit", async (e) => {
         name: pick.name,
         lat: pick.lat,
         lng: pick.lng,
-        amount: els.amount.value,
-        unit: els.unit.value,
+        ...formWheels.get(),
       })
     ) {
       els.query.value = "";
       selectedSearch = null;
+      formWheels.reset();
       els.query.focus();
     }
   } catch (err) {
     setStatus(err.message || "Could not geocode", true);
   }
-});
-
-els.body.addEventListener("change", (e) => {
-  const input = e.target.closest("input[data-field], select[data-field]");
-  if (!input) return;
-  const tr = input.closest("tr");
-  const place = places.find((p) => p.id === tr.dataset.id);
-  if (!place) return;
-
-  const field = input.dataset.field;
-  const draft = {
-    ...place,
-    amount: field === "amount" ? input.value : place.amount,
-    unit: field === "unit" ? input.value : place.unit,
-  };
-  const err = validatePlaceDuration(draft);
-  if (err) {
-    setStatus(err, true);
-    if (field === "amount") input.value = place.amount;
-    if (field === "unit") input.value = place.unit;
-    return;
-  }
-  if (field === "amount") place.amount = Number(input.value);
-  if (field === "unit") place.unit = input.value;
-  selectedId = place.id;
-  refreshViews();
 });
 
 els.body.addEventListener("click", (e) => {
@@ -817,16 +851,16 @@ els.body.addEventListener("click", (e) => {
     removePlace(id);
     return;
   }
-  if (e.target.closest("[data-action=select]") || e.target.closest("[data-action=edit]")) {
+  if (e.target.closest("[data-action=edit]")) {
     const place = places.find((p) => p.id === id);
-    if (place && mode === "edit" && e.target.closest("[data-action=edit]")) {
-      openEditModal(place);
-      return;
-    }
+    if (place && mode === "edit") openEditModal(place);
+    return;
+  }
+  if (e.target.closest("[data-action=select]")) {
     selectPlace(id);
     return;
   }
-  if (!e.target.closest("input, select, button")) {
+  if (!e.target.closest("button")) {
     selectPlace(id);
   }
 });
@@ -885,8 +919,8 @@ function loadSaved() {
   }
 }
 
-resetDurationDefaults(els.amount, els.unit);
-resetDurationDefaults(els.clickAmount, els.clickUnit);
+formWheels.reset();
+modalWheels.reset();
 loadSaved();
 refreshViews();
 setMode(localStorage.getItem(MODE_KEY) === "view" ? "view" : "edit");

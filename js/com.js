@@ -1,24 +1,25 @@
-/** Time-weighted centre of mass; each place has amount + unit (days|months|years). */
+/** Time-weighted centre of mass; each place has years + months + days. */
 
-export const DURATION_UNITS = ["days", "months", "years"];
+export const DAYS_PER_MONTH = 30.436875;
+export const DAYS_PER_YEAR = 365.2425;
 
-const DAYS_PER_MONTH = 30.436875;
-const DAYS_PER_YEAR = 365.2425;
+export const WHEEL_MAX = { years: 80, months: 11, days: 30 };
 
-/** @param {{ amount: number, unit: string }} place */
+/** @typedef {{ years: number, months: number, days: number }} DurationParts */
+
+/** @param {Partial<DurationParts>} parts */
+export function clampDurationParts(parts = {}) {
+  return {
+    years: Math.max(0, Math.min(WHEEL_MAX.years, Math.round(Number(parts.years) || 0))),
+    months: Math.max(0, Math.min(WHEEL_MAX.months, Math.round(Number(parts.months) || 0))),
+    days: Math.max(0, Math.min(WHEEL_MAX.days, Math.round(Number(parts.days) || 0))),
+  };
+}
+
+/** @param {DurationParts} place */
 export function durationDays(place) {
-  const amount = Number(place.amount);
-  if (!Number.isFinite(amount) || amount <= 0) return 0;
-  switch (place.unit) {
-    case "days":
-      return amount;
-    case "months":
-      return amount * DAYS_PER_MONTH;
-    case "years":
-      return amount * DAYS_PER_YEAR;
-    default:
-      return 0;
-  }
+  const { years, months, days } = clampDurationParts(place);
+  return years * DAYS_PER_YEAR + months * DAYS_PER_MONTH + days;
 }
 
 /** Fractional months — used for CoM weighting and summary copy. */
@@ -41,36 +42,61 @@ export function formatDuration(months) {
 }
 
 export function formatPlaceDuration(place) {
-  const amount = Number(place.amount);
-  const unit = place.unit;
-  if (!Number.isFinite(amount) || amount <= 0 || !DURATION_UNITS.includes(unit)) {
-    return "—";
-  }
-  const rounded = Number.isInteger(amount) ? amount : Math.round(amount * 10) / 10;
-  const label =
-    unit === "days"
-      ? `day${rounded === 1 ? "" : "s"}`
-      : unit === "months"
-        ? `month${rounded === 1 ? "" : "s"}`
-        : `year${rounded === 1 ? "" : "s"}`;
-  return `${rounded} ${label}`;
+  const { years, months, days } = clampDurationParts(place);
+  if (years + months + days <= 0) return "—";
+  const parts = [];
+  if (years) parts.push(`${years}y`);
+  if (months) parts.push(`${months}m`);
+  if (days) parts.push(`${days}d`);
+  return parts.join(" ");
 }
 
 /** @returns {string | null} error message */
 export function validatePlaceDuration(place) {
-  const amount = Number(place.amount);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return "Enter how long you spent there (a positive number).";
-  }
-  if (!DURATION_UNITS.includes(place.unit)) {
-    return "Choose days, months, or years.";
+  const { years, months, days } = clampDurationParts(place);
+  if (years + months + days <= 0) {
+    return "Set at least one of years, months, or days.";
   }
   return null;
 }
 
+/** Break a day total into wheel-friendly parts. */
+export function partsFromDays(totalDays) {
+  let rem = Math.max(0, Number(totalDays) || 0);
+  const years = Math.min(WHEEL_MAX.years, Math.floor(rem / DAYS_PER_YEAR));
+  rem -= years * DAYS_PER_YEAR;
+  const months = Math.min(WHEEL_MAX.months, Math.floor(rem / DAYS_PER_MONTH));
+  rem -= months * DAYS_PER_MONTH;
+  const days = Math.min(WHEEL_MAX.days, Math.max(0, Math.round(rem)));
+  return clampDurationParts({ years, months, days });
+}
+
+/** Migrate legacy { amount, unit } into wheel parts. */
+export function partsFromAmountUnit(amount, unit) {
+  const n = Number(amount);
+  if (!Number.isFinite(n) || n <= 0) return clampDurationParts();
+  if (Number.isInteger(n)) {
+    if (unit === "years") return clampDurationParts({ years: n });
+    if (unit === "months") {
+      return clampDurationParts({
+        years: Math.floor(n / 12),
+        months: n % 12,
+      });
+    }
+    if (unit === "days") return partsFromDays(n);
+  }
+  const days =
+    unit === "years"
+      ? n * DAYS_PER_YEAR
+      : unit === "months"
+        ? n * DAYS_PER_MONTH
+        : n;
+  return partsFromDays(days);
+}
+
 /**
- * Migrate legacy start/end month entries (and already-duration entries) into
- * { amount, unit }.
+ * Migrate legacy start/end or amount/unit entries into
+ * { years, months, days }.
  */
 export function normalizePlace(raw) {
   if (!raw || typeof raw !== "object") return null;
@@ -85,13 +111,16 @@ export function normalizePlace(raw) {
     return null;
   }
 
+  if (raw.years != null || raw.months != null || raw.days != null) {
+    const parts = clampDurationParts(raw);
+    if (parts.years + parts.months + parts.days <= 0) return null;
+    return { ...base, ...parts };
+  }
+
   if (raw.amount != null && raw.unit) {
-    const amount = Number(raw.amount);
-    const unit = String(raw.unit);
-    if (!Number.isFinite(amount) || amount <= 0 || !DURATION_UNITS.includes(unit)) {
-      return null;
-    }
-    return { ...base, amount, unit };
+    const parts = partsFromAmountUnit(raw.amount, String(raw.unit));
+    if (parts.years + parts.months + parts.days <= 0) return null;
+    return { ...base, ...parts };
   }
 
   // Legacy YYYY-MM start/end → inclusive months
@@ -100,7 +129,7 @@ export function normalizePlace(raw) {
     const b = monthIndex(raw.end);
     if (Number.isNaN(a) || Number.isNaN(b) || b < a) return null;
     const months = b - a + 1;
-    return { ...base, amount: months, unit: "months" };
+    return { ...base, ...partsFromAmountUnit(months, "months") };
   }
 
   return null;
@@ -211,9 +240,7 @@ export function computeCentreOfMass(places) {
     lat: (Math.asin(com[2]) * 180) / Math.PI,
     lng: (Math.atan2(com[1], com[0]) * 180) / Math.PI,
     totalMonths: wsum,
-    /** Time-weighted mean of squared angular distance (rad²). */
     varianceRad2,
-    /** RMS angular distance from CoM (degrees) — 0 if all points coincide. */
     rmsSpreadDeg: rmsDeg,
     rmsSpreadRad: rmsRad,
   };

@@ -57,27 +57,14 @@
             />
             <div id="suggestions" class="suggestions" role="listbox"></div>
           </div>
-          <div class="duration-row">
-            <div class="field duration-amount">
-              <label for="duration-amount">Time spent</label>
-              <input
-                id="duration-amount"
-                name="amount"
-                type="number"
-                min="0.1"
-                step="any"
-                value="1"
-                required
-              />
-            </div>
-            <div class="field duration-unit">
-              <label for="duration-unit">Unit</label>
-              <select id="duration-unit" name="unit" required>
-                <option value="days">days</option>
-                <option value="months" selected>months</option>
-                <option value="years">years</option>
-              </select>
-            </div>
+          <div class="field">
+            <span class="field-label">Time spent</span>
+            <div
+              class="duration-wheels"
+              id="duration-wheels"
+              role="group"
+              aria-label="Time spent"
+            ></div>
           </div>
           <div class="form-actions">
             <button class="btn-primary" type="submit">Add place</button>
@@ -127,26 +114,14 @@
             <label for="click-name">Name</label>
             <input id="click-name" required />
           </div>
-          <div class="duration-row">
-            <div class="field duration-amount">
-              <label for="click-amount">Time spent</label>
-              <input
-                id="click-amount"
-                type="number"
-                min="0.1"
-                step="any"
-                value="1"
-                required
-              />
-            </div>
-            <div class="field duration-unit">
-              <label for="click-unit">Unit</label>
-              <select id="click-unit" required>
-                <option value="days">days</option>
-                <option value="months" selected>months</option>
-                <option value="years">years</option>
-              </select>
-            </div>
+          <div class="field">
+            <span class="field-label">Time spent</span>
+            <div
+              class="duration-wheels"
+              id="click-duration-wheels"
+              role="group"
+              aria-label="Time spent"
+            ></div>
           </div>
           <div class="field" id="move-field" hidden>
             <label for="click-move">Move to (optional search)</label>

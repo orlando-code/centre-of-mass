@@ -67,9 +67,29 @@ body {
 
 .mode-actions {
   display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.mode-actions-row {
+  display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
   justify-content: flex-end;
+}
+
+.site-back-link {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.site-back-link:hover {
+  color: var(--sea);
 }
 
 button,

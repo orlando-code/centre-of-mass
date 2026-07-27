@@ -22,7 +22,7 @@ export function durationDays(place) {
   return years * DAYS_PER_YEAR + months * DAYS_PER_MONTH + days;
 }
 
-/** Fractional months — used for CoM weighting and summary copy. */
+/** Fractional months – used for CoM weighting and summary copy. */
 export function durationMonths(place) {
   return durationDays(place) / DAYS_PER_MONTH;
 }
@@ -43,7 +43,7 @@ export function formatDuration(months) {
 
 export function formatPlaceDuration(place) {
   const { years, months, days } = clampDurationParts(place);
-  if (years + months + days <= 0) return "—";
+  if (years + months + days <= 0) return "–";
   const parts = [];
   if (years) parts.push(`${years}y`);
   if (months) parts.push(`${months}m`);

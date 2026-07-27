@@ -279,7 +279,7 @@ function renderTable() {
   els.body.innerHTML = "";
   if (!places.length) {
     els.body.innerHTML =
-      `<tr><td colspan="3" style="color: var(--muted)">No places yet — search above or click the map.</td></tr>`;
+      `<tr><td colspan="3" style="color: var(--muted)">No places yet – search above or click the map.</td></tr>`;
     return;
   }
 

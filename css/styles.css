@@ -224,7 +224,8 @@ tr.selectable:hover {
   color: var(--muted);
 }
 
-.field input {
+.field input,
+.field select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -234,15 +235,17 @@ tr.selectable:hover {
   color: var(--ink);
 }
 
-.field input:focus {
+.field input:focus,
+.field select:focus {
   outline: 2px solid rgba(31, 111, 139, 0.35);
   border-color: var(--sea);
 }
 
-.years {
+.duration-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1.1fr 1fr;
   gap: 0.6rem;
+  align-items: end;
 }
 
 .search-wrap {
@@ -329,7 +332,8 @@ th {
   color: var(--muted);
 }
 
-td input {
+td input,
+td select {
   width: 100%;
   border: 1px solid transparent;
   border-radius: 8px;
@@ -339,10 +343,53 @@ td input {
 }
 
 td input:hover,
-td input:focus {
+td input:focus,
+td select:hover,
+td select:focus {
   border-color: var(--line);
   background: white;
   outline: none;
+}
+
+.duration-edit {
+  display: grid;
+  grid-template-columns: minmax(3.5rem, 1fr) minmax(4.5rem, 1.1fr);
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.place-select {
+  all: unset;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.place-select:hover {
+  color: var(--sea);
+}
+
+.actions-cell {
+  width: 2.75rem;
+  text-align: right;
+}
+
+.btn-icon-remove {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(180, 35, 24, 0.18);
+  background: #fdeceb;
+  color: #b42318;
+  font-size: 1.25rem;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.btn-icon-remove:hover {
+  background: #f9d5d2;
+  transform: none;
 }
 
 .panel-footer {
@@ -534,7 +581,7 @@ td input:focus {
   font-size: 0.9rem;
 }
 
-.modal .years {
+.modal .duration-row {
   margin-bottom: 0.85rem;
 }
 

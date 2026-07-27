@@ -1,60 +1,116 @@
-/** Time-weighted centre of mass; dates are YYYY-MM. */
+/** Time-weighted centre of mass; each place has amount + unit (days|months|years). */
 
-/** @param {string} ym */
-export function monthIndex(ym) {
-  const [y, m] = String(ym).split("-").map(Number);
-  if (!y || !m) return NaN;
-  return y * 12 + (m - 1);
+export const DURATION_UNITS = ["days", "months", "years"];
+
+const DAYS_PER_MONTH = 30.436875;
+const DAYS_PER_YEAR = 365.2425;
+
+/** @param {{ amount: number, unit: string }} place */
+export function durationDays(place) {
+  const amount = Number(place.amount);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  switch (place.unit) {
+    case "days":
+      return amount;
+    case "months":
+      return amount * DAYS_PER_MONTH;
+    case "years":
+      return amount * DAYS_PER_YEAR;
+    default:
+      return 0;
+  }
 }
 
-/** @param {number} index */
-export function indexToMonth(index) {
-  const y = Math.floor(index / 12);
-  const m = (index % 12) + 1;
-  return `${y}-${String(m).padStart(2, "0")}`;
-}
-
-/** @param {string} ym */
-export function monthAfter(ym) {
-  return indexToMonth(monthIndex(ym) + 1);
-}
-
-/** Inclusive months; requires end > start. */
+/** Fractional months — used for CoM weighting and summary copy. */
 export function durationMonths(place) {
-  const a = monthIndex(place.start);
-  const b = monthIndex(place.end);
-  if (Number.isNaN(a) || Number.isNaN(b) || b <= a) return 0;
-  return b - a + 1;
+  return durationDays(place) / DAYS_PER_MONTH;
 }
 
 export function formatDuration(months) {
-  if (months < 12) return `${months} month${months === 1 ? "" : "s"}`;
+  if (!(months > 0)) return "0 months";
+  if (months < 1) {
+    const days = Math.round(months * DAYS_PER_MONTH);
+    return `${days} day${days === 1 ? "" : "s"}`;
+  }
+  if (months < 12) {
+    const rounded = Math.round(months * 10) / 10;
+    return `${rounded} month${rounded === 1 ? "" : "s"}`;
+  }
   const years = Math.round((months / 12) * 10) / 10;
   return `${years} year${years === 1 ? "" : "s"}`;
 }
 
-function rangesOverlap(a, b) {
-  const a0 = monthIndex(a.start);
-  const a1 = monthIndex(a.end);
-  const b0 = monthIndex(b.start);
-  const b1 = monthIndex(b.end);
-  if ([a0, a1, b0, b1].some(Number.isNaN)) return false;
-  return a0 <= b1 && b0 <= a1;
+export function formatPlaceDuration(place) {
+  const amount = Number(place.amount);
+  const unit = place.unit;
+  if (!Number.isFinite(amount) || amount <= 0 || !DURATION_UNITS.includes(unit)) {
+    return "—";
+  }
+  const rounded = Number.isInteger(amount) ? amount : Math.round(amount * 10) / 10;
+  const label =
+    unit === "days"
+      ? `day${rounded === 1 ? "" : "s"}`
+      : unit === "months"
+        ? `month${rounded === 1 ? "" : "s"}`
+        : `year${rounded === 1 ? "" : "s"}`;
+  return `${rounded} ${label}`;
 }
 
 /** @returns {string | null} error message */
-export function validatePlaceDates(place, places, ignoreId) {
-  const a = monthIndex(place.start);
-  const b = monthIndex(place.end);
-  if (Number.isNaN(a) || Number.isNaN(b)) return "Enter start and end as month–year.";
-  if (b <= a) return "End must be later than start.";
-  for (const other of places) {
-    if (ignoreId && other.id === ignoreId) continue;
-    if (rangesOverlap(place, other)) {
-      return `Dates overlap with ${other.name} (${other.start}–${other.end}).`;
-    }
+export function validatePlaceDuration(place) {
+  const amount = Number(place.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return "Enter how long you spent there (a positive number).";
+  }
+  if (!DURATION_UNITS.includes(place.unit)) {
+    return "Choose days, months, or years.";
   }
   return null;
+}
+
+/**
+ * Migrate legacy start/end month entries (and already-duration entries) into
+ * { amount, unit }.
+ */
+export function normalizePlace(raw) {
+  if (!raw || typeof raw !== "object") return null;
+
+  const base = {
+    id: String(raw.id || ""),
+    name: String(raw.name || "").trim(),
+    lat: Number(raw.lat),
+    lng: Number(raw.lng),
+  };
+  if (!base.id || !base.name || Number.isNaN(base.lat) || Number.isNaN(base.lng)) {
+    return null;
+  }
+
+  if (raw.amount != null && raw.unit) {
+    const amount = Number(raw.amount);
+    const unit = String(raw.unit);
+    if (!Number.isFinite(amount) || amount <= 0 || !DURATION_UNITS.includes(unit)) {
+      return null;
+    }
+    return { ...base, amount, unit };
+  }
+
+  // Legacy YYYY-MM start/end → inclusive months
+  if (raw.start && raw.end) {
+    const a = monthIndex(raw.start);
+    const b = monthIndex(raw.end);
+    if (Number.isNaN(a) || Number.isNaN(b) || b < a) return null;
+    const months = b - a + 1;
+    return { ...base, amount: months, unit: "months" };
+  }
+
+  return null;
+}
+
+/** @param {string} ym */
+function monthIndex(ym) {
+  const [y, m] = String(ym).split("-").map(Number);
+  if (!y || !m) return NaN;
+  return y * 12 + (m - 1);
 }
 
 function toUnit(latDeg, lngDeg) {

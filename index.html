@@ -21,7 +21,7 @@
       <div class="brand">
         <h1>Life's centre of mass</h1>
         <p>
-          Where is your centre? Pin places on the map by click or search. 
+          Where is your centre? Pin places on the map by click or search.
         </p>
         <p>
           Reveal the time-weighted centre of mass of your life so far.
@@ -42,13 +42,13 @@
         <div class="panel-header">
           <h2>Your places</h2>
           <p>
-            Search or click the map to add.
+            Choose a place, say how long you were there, then add another — same place twice is fine.
           </p>
         </div>
 
         <form class="entry-form" id="add-form" autocomplete="off">
           <div class="field search-wrap">
-            <label for="place-query">Place name</label>
+            <label for="place-query">Place</label>
             <input
               id="place-query"
               name="query"
@@ -57,18 +57,30 @@
             />
             <div id="suggestions" class="suggestions" role="listbox"></div>
           </div>
-          <div class="years">
-            <div class="field">
-              <label for="start-month">Start</label>
-              <input id="start-month" name="start" type="month" required />
+          <div class="duration-row">
+            <div class="field duration-amount">
+              <label for="duration-amount">Time spent</label>
+              <input
+                id="duration-amount"
+                name="amount"
+                type="number"
+                min="0.1"
+                step="any"
+                value="1"
+                required
+              />
             </div>
-            <div class="field">
-              <label for="end-month">End</label>
-              <input id="end-month" name="end" type="month" required />
+            <div class="field duration-unit">
+              <label for="duration-unit">Unit</label>
+              <select id="duration-unit" name="unit" required>
+                <option value="days">days</option>
+                <option value="months" selected>months</option>
+                <option value="years">years</option>
+              </select>
             </div>
           </div>
           <div class="form-actions">
-            <button class="btn-primary" type="submit">Add from search</button>
+            <button class="btn-primary" type="submit">Add place</button>
           </div>
           <div id="form-status" class="status" aria-live="polite"></div>
         </form>
@@ -77,9 +89,8 @@
           <table>
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Start</th>
-                <th>End</th>
+                <th>Place</th>
+                <th>Time</th>
                 <th></th>
               </tr>
             </thead>
@@ -116,14 +127,25 @@
             <label for="click-name">Name</label>
             <input id="click-name" required />
           </div>
-          <div class="years">
-            <div class="field">
-              <label for="click-start">Start</label>
-              <input id="click-start" type="month" required />
+          <div class="duration-row">
+            <div class="field duration-amount">
+              <label for="click-amount">Time spent</label>
+              <input
+                id="click-amount"
+                type="number"
+                min="0.1"
+                step="any"
+                value="1"
+                required
+              />
             </div>
-            <div class="field">
-              <label for="click-end">End</label>
-              <input id="click-end" type="month" required />
+            <div class="field duration-unit">
+              <label for="click-unit">Unit</label>
+              <select id="click-unit" required>
+                <option value="days">days</option>
+                <option value="months" selected>months</option>
+                <option value="years">years</option>
+              </select>
             </div>
           </div>
           <div class="field" id="move-field" hidden>

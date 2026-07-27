@@ -3,19 +3,19 @@ import {
   angularCircle,
   computeCentreOfMass,
   formatDuration,
+  formatPlaceDuration,
   formatSpread,
-  indexToMonth,
-  monthAfter,
-  monthIndex,
-  validatePlaceDates,
+  normalizePlace,
+  validatePlaceDuration,
 } from "./com.js";
 
-const STORAGE_KEY = "com-places-v3";
+const STORAGE_KEY = "com-places-v4";
+const LEGACY_STORAGE_KEY = "com-places-v3";
 const MODE_KEY = "com-mode-v1";
 const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 const MAX_ZOOM = 10;
 
-/** @typedef {{ id: string, name: string, lat: number, lng: number, start: string, end: string }} Place */
+/** @typedef {{ id: string, name: string, lat: number, lng: number, amount: number, unit: "days"|"months"|"years" }} Place */
 /** @typedef {{ name: string, lat: number, lng: number, label: string }} GeoHit */
 
 /** @type {Place[]} */
@@ -48,8 +48,8 @@ const els = {
   body: $("places-body"),
   form: $("add-form"),
   query: $("place-query"),
-  start: $("start-month"),
-  end: $("end-month"),
+  amount: $("duration-amount"),
+  unit: $("duration-unit"),
   suggestions: $("suggestions"),
   status: $("form-status"),
   btnDone: $("btn-done"),
@@ -61,8 +61,8 @@ const els = {
   modalTitle: $("modal-title"),
   clickForm: $("click-form"),
   clickName: $("click-name"),
-  clickStart: $("click-start"),
-  clickEnd: $("click-end"),
+  clickAmount: $("click-amount"),
+  clickUnit: $("click-unit"),
   clickCoords: $("click-coords"),
   clickCancel: $("click-cancel"),
   clickDelete: $("click-delete"),
@@ -88,27 +88,6 @@ function escapeAttr(s) {
     .replaceAll("<", "&lt;");
 }
 
-function currentMonth() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function defaultDatePair() {
-  if (places.length) {
-    const latest = [...places].sort((a, b) => (a.end < b.end ? -1 : 1)).at(-1);
-    const start = monthAfter(latest.end);
-    return { start, end: monthAfter(start) };
-  }
-  const end = currentMonth();
-  return { start: indexToMonth(monthIndex(end) - 11), end };
-}
-
-function applyDefaultDates(startEl, endEl) {
-  const { start, end } = defaultDatePair();
-  startEl.value = start;
-  endEl.value = end;
-}
-
 function setStatus(message, isError = false) {
   els.status.textContent = message || "";
   els.status.classList.toggle("error", isError);
@@ -120,6 +99,11 @@ function getSelected() {
 
 function updateRevealButton() {
   els.btnDone.disabled = places.length === 0;
+}
+
+function resetDurationDefaults(amountEl, unitEl) {
+  amountEl.value = "1";
+  unitEl.value = "months";
 }
 
 /* ---------- Autocomplete ---------- */
@@ -230,25 +214,30 @@ function renderTable() {
   els.body.innerHTML = "";
   if (!places.length) {
     els.body.innerHTML =
-      `<tr><td colspan="4" style="color: var(--muted)">No places yet — search above or click the map.</td></tr>`;
+      `<tr><td colspan="3" style="color: var(--muted)">No places yet — search above or click the map.</td></tr>`;
     return;
   }
 
-  const ordered = [...places].sort((a, b) =>
-    a.start < b.start ? -1 : a.start > b.start ? 1 : 0
-  );
-
-  for (const place of ordered) {
+  for (const place of places) {
     const tr = document.createElement("tr");
     tr.dataset.id = place.id;
     tr.className = "selectable" + (place.id === selectedId ? " selected" : "");
     tr.innerHTML = `
-      <td><input data-field="name" value="${escapeAttr(place.name)}" /></td>
-      <td><input data-field="start" type="month" value="${escapeAttr(place.start)}" /></td>
-      <td><input data-field="end" type="month" value="${escapeAttr(place.end)}" /></td>
-      <td>
-        <button type="button" class="btn-ghost" data-action="edit">Edit</button>
-        <button type="button" class="btn-danger" data-action="delete">Remove</button>
+      <td class="place-name-cell">
+        <button type="button" class="place-select" data-action="select">${escapeAttr(place.name)}</button>
+      </td>
+      <td class="duration-cell">
+        <div class="duration-edit">
+          <input data-field="amount" type="number" min="0.1" step="any" value="${escapeAttr(place.amount)}" aria-label="Duration amount" />
+          <select data-field="unit" aria-label="Duration unit">
+            <option value="days"${place.unit === "days" ? " selected" : ""}>days</option>
+            <option value="months"${place.unit === "months" ? " selected" : ""}>months</option>
+            <option value="years"${place.unit === "years" ? " selected" : ""}>years</option>
+          </select>
+        </div>
+      </td>
+      <td class="actions-cell">
+        <button type="button" class="btn-icon-remove" data-action="delete" title="Remove ${escapeAttr(place.name)}" aria-label="Remove ${escapeAttr(place.name)}">×</button>
       </td>
     `;
     els.body.appendChild(tr);
@@ -279,14 +268,14 @@ function addPlace(partial) {
     name: String(partial.name).trim(),
     lat: Number(partial.lat),
     lng: Number(partial.lng),
-    start: partial.start,
-    end: partial.end,
+    amount: Number(partial.amount),
+    unit: partial.unit,
   };
   if (!place.name || Number.isNaN(place.lat) || Number.isNaN(place.lng)) {
     setStatus("Need a valid place with coordinates.", true);
     return false;
   }
-  const err = validatePlaceDates(place, places);
+  const err = validatePlaceDuration(place);
   if (err) {
     setStatus(err, true);
     return false;
@@ -295,7 +284,7 @@ function addPlace(partial) {
   selectedSearch = null;
   selectedId = place.id;
   refreshViews();
-  setStatus(`Added ${place.name}.`);
+  setStatus(`Added ${place.name} (${formatPlaceDuration(place)}).`);
   flyToPlace(place);
   return true;
 }
@@ -309,12 +298,12 @@ function updatePlace(id, partial) {
       partial.name != null
         ? String(partial.name).trim() || place.name
         : place.name,
-    start: partial.start ?? place.start,
-    end: partial.end ?? place.end,
+    amount: partial.amount != null ? Number(partial.amount) : place.amount,
+    unit: partial.unit ?? place.unit,
     lat: partial.lat != null ? Number(partial.lat) : place.lat,
     lng: partial.lng != null ? Number(partial.lng) : place.lng,
   };
-  const err = validatePlaceDates(next, places, id);
+  const err = validatePlaceDuration(next);
   if (err) {
     setStatus(err, true);
     return false;
@@ -326,9 +315,11 @@ function updatePlace(id, partial) {
 }
 
 function removePlace(id) {
+  const removed = places.find((p) => p.id === id);
   places = places.filter((p) => p.id !== id);
   if (selectedId === id) selectedId = null;
   refreshViews();
+  if (removed) setStatus(`Removed ${removed.name}.`);
 }
 
 /* ---------- Centre of mass UI ---------- */
@@ -439,7 +430,7 @@ function renderComCard() {
   )} RMS`;
   els.comMeta.textContent = `Weighted by ${formatDuration(
     centreOfMass.totalMonths
-  )} across ${places.length} place${places.length === 1 ? "" : "s"}`;
+  )} across ${places.length} entr${places.length === 1 ? "y" : "ies"}`;
   els.comSettlement.textContent = comSettlement
     ? comSettlement.label || comSettlement.name
     : "Finding nearest settlement…";
@@ -468,7 +459,6 @@ async function updateCentreOfMass() {
 function refreshViews() {
   renderTable();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(places));
-  applyDefaultDates(els.start, els.end);
   updateRevealButton();
   updateCentreOfMass();
 }
@@ -504,7 +494,7 @@ function setMode(next) {
   els.badge.hidden = isView;
   updateRevealButton();
 
-  els.form.querySelectorAll("input, button[type=submit]").forEach((el) => {
+  els.form.querySelectorAll("input, select, button[type=submit]").forEach((el) => {
     el.disabled = isView;
   });
 
@@ -651,7 +641,7 @@ function openAddModal(lat, lng) {
   els.moveField.hidden = true;
   els.clickMove.value = "";
   moveAc.hide();
-  applyDefaultDates(els.clickStart, els.clickEnd);
+  resetDurationDefaults(els.clickAmount, els.clickUnit);
   els.clickName.value = "";
   els.clickCoords.textContent = `Resolving ${lat.toFixed(3)}, ${lng.toFixed(3)}…`;
   els.modal.classList.add("open");
@@ -682,8 +672,8 @@ function openEditModal(place) {
   els.clickMove.value = "";
   moveAc.hide();
   els.clickName.value = place.name;
-  els.clickStart.value = place.start;
-  els.clickEnd.value = place.end;
+  els.clickAmount.value = String(place.amount);
+  els.clickUnit.value = place.unit;
   els.clickCoords.textContent = `${place.name} (${place.lat.toFixed(3)}, ${place.lng.toFixed(3)})`;
   els.modal.classList.add("open");
   renderTable();
@@ -697,7 +687,6 @@ els.modal.addEventListener("click", (e) => {
 });
 els.clickDelete.addEventListener("click", () => {
   if (modalMode !== "edit" || !selectedId) return;
-  if (!confirm("Delete this place?")) return;
   removePlace(selectedId);
   closeModal();
 });
@@ -712,8 +701,8 @@ els.clickForm.addEventListener("submit", async (e) => {
         name: els.clickName.value,
         lat: pendingClick.lat,
         lng: pendingClick.lng,
-        start: els.clickStart.value,
-        end: els.clickEnd.value,
+        amount: els.clickAmount.value,
+        unit: els.clickUnit.value,
       })
     ) {
       closeModal();
@@ -749,8 +738,8 @@ els.clickForm.addEventListener("submit", async (e) => {
   if (
     updatePlace(selectedId, {
       name: els.clickName.value,
-      start: els.clickStart.value,
-      end: els.clickEnd.value,
+      amount: els.clickAmount.value,
+      unit: els.clickUnit.value,
       lat,
       lng,
     })
@@ -780,12 +769,13 @@ els.form.addEventListener("submit", async (e) => {
         name: pick.name,
         lat: pick.lat,
         lng: pick.lng,
-        start: els.start.value,
-        end: els.end.value,
+        amount: els.amount.value,
+        unit: els.unit.value,
       })
     ) {
       els.query.value = "";
       selectedSearch = null;
+      els.query.focus();
     }
   } catch (err) {
     setStatus(err.message || "Could not geocode", true);
@@ -793,7 +783,7 @@ els.form.addEventListener("submit", async (e) => {
 });
 
 els.body.addEventListener("change", (e) => {
-  const input = e.target.closest("input[data-field]");
+  const input = e.target.closest("input[data-field], select[data-field]");
   if (!input) return;
   const tr = input.closest("tr");
   const place = places.find((p) => p.id === tr.dataset.id);
@@ -801,21 +791,19 @@ els.body.addEventListener("change", (e) => {
 
   const field = input.dataset.field;
   const draft = {
-    name: field === "name" ? input.value : place.name,
-    start: field === "start" ? input.value : place.start,
-    end: field === "end" ? input.value : place.end,
-    lat: place.lat,
-    lng: place.lng,
+    ...place,
+    amount: field === "amount" ? input.value : place.amount,
+    unit: field === "unit" ? input.value : place.unit,
   };
-  const err = validatePlaceDates(draft, places, place.id);
+  const err = validatePlaceDuration(draft);
   if (err) {
     setStatus(err, true);
-    input.value = place[field];
+    if (field === "amount") input.value = place.amount;
+    if (field === "unit") input.value = place.unit;
     return;
   }
-  if (field === "name") place.name = input.value.trim() || place.name;
-  if (field === "start") place.start = input.value;
-  if (field === "end") place.end = input.value;
+  if (field === "amount") place.amount = Number(input.value);
+  if (field === "unit") place.unit = input.value;
   selectedId = place.id;
   refreshViews();
 });
@@ -825,15 +813,22 @@ els.body.addEventListener("click", (e) => {
   if (!tr) return;
   const id = tr.dataset.id;
   if (e.target.closest("[data-action=delete]")) {
+    e.stopPropagation();
     removePlace(id);
     return;
   }
-  if (e.target.closest("[data-action=edit]")) {
+  if (e.target.closest("[data-action=select]") || e.target.closest("[data-action=edit]")) {
     const place = places.find((p) => p.id === id);
-    if (place) openEditModal(place);
+    if (place && mode === "edit" && e.target.closest("[data-action=edit]")) {
+      openEditModal(place);
+      return;
+    }
+    selectPlace(id);
     return;
   }
-  selectPlace(id);
+  if (!e.target.closest("input, select, button")) {
+    selectPlace(id);
+  }
 });
 
 els.btnDone.addEventListener("click", () => setMode("view"));
@@ -876,15 +871,22 @@ document.addEventListener("keydown", (e) => {
 /* ---------- Boot ---------- */
 function loadSaved() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    places = Array.isArray(parsed) ? parsed : [];
+    let raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+    const parsed = JSON.parse(raw || "[]");
+    places = Array.isArray(parsed)
+      ? parsed.map(normalizePlace).filter(Boolean)
+      : [];
+    if (places.length) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(places));
+    }
   } catch {
     places = [];
   }
 }
 
-applyDefaultDates(els.start, els.end);
-applyDefaultDates(els.clickStart, els.clickEnd);
+resetDurationDefaults(els.amount, els.unit);
+resetDurationDefaults(els.clickAmount, els.clickUnit);
 loadSaved();
 refreshViews();
 setMode(localStorage.getItem(MODE_KEY) === "view" ? "view" : "edit");

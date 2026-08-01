@@ -24,7 +24,7 @@ I'm a born-and-raised Brit with a lot of Antipodean friends who are currently li
 | Forward geocode | [Open-Meteo](https://open-meteo.com/en/docs/geocoding-api) |
 | Reverse geocode | [BigDataCloud](https://www.bigdatacloud.com/docs/api/free-reverse-geocode-to-city-api) client API |
 | Centre of mass | Time-weighted average on the planetary sphere (duration lived at each place) |
-| Spread | Time-weighted root mean squared angular distance from the CoM (ie. 0 if all points coincide, bigger with additional spread), indicated via a gold ring. Mathematically, it's $\sigma = \sqrt((\sum_i t_i \times  \theta_i) / \sum_i t_i$) where $t$ is the time spent at each of $i$ locations |
+| Spread | Equivalent angular spread $\delta = \arccos(\bar R)$ from the mean resultant length $\bar R = \lVert\sum_i t_i\mathbf{u}_i\rVert / \sum_i t_i$ of the time-weighted unit vectors. $0^\circ$ if all time is in one place; up to $90^\circ$ when directions cancel (e.g. equal time at antipodes). Shown as a gold ring. |
 | Nearest settlement | Reverse geocode of the centre of mass (cached in `localStorage` to keep things fast) |
 | Time | Duration at each place: days, months, or years. The same place can be added more than once with different durations. |
 

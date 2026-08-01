@@ -176,12 +176,6 @@ function toUnit(latDeg, lngDeg) {
   return [cosLat * Math.cos(lng), cosLat * Math.sin(lng), Math.sin(lat)];
 }
 
-/** Great-circle angle (radians) between two unit vectors. */
-function angleBetween(a, b) {
-  const dot = Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]));
-  return Math.acos(dot);
-}
-
 /**
  * Destination point after travelling `distRad` along bearing `brngRad`
  * from (latDeg, lngDeg). Distances are central angles on the unit sphere.
@@ -215,15 +209,16 @@ export function angularCircle(latDeg, lngDeg, radiusRad, steps = 96) {
   return coords;
 }
 
-export function formatSpread(rmsDeg) {
-  if (!(rmsDeg > 0.05)) return "0°";
-  if (rmsDeg < 1) return `${rmsDeg.toFixed(2)}°`;
-  return `${rmsDeg.toFixed(1)}°`;
+export function formatSpread(spreadDeg) {
+  if (!(spreadDeg > 0.05)) return "0°";
+  if (spreadDeg < 1) return `${spreadDeg.toFixed(2)}°`;
+  return `${spreadDeg.toFixed(1)}°`;
 }
 
 /**
- * Time-weighted spherical centre of mass, plus variance of angular
- * distance from that centre (0 when every weighted point coincides).
+ * Time-weighted spherical centre of mass, plus directional spread from the
+ * mean resultant length R̄ (0° when every weighted point coincides; up to
+ * 90° when the weighted directions cancel).
  */
 export function computeCentreOfMass(places) {
   if (!places?.length) return null;
@@ -232,14 +227,11 @@ export function computeCentreOfMass(places) {
   let wy = 0;
   let wz = 0;
   let wsum = 0;
-  /** @type {{ w: number, u: number[] }[]} */
-  const weighted = [];
 
   for (const p of places) {
     const w = durationMonths(p);
     if (w <= 0) continue;
     const u = toUnit(p.lat, p.lng);
-    weighted.push({ w, u });
     wx += w * u[0];
     wy += w * u[1];
     wz += w * u[2];
@@ -251,24 +243,19 @@ export function computeCentreOfMass(places) {
   wx /= wsum;
   wy /= wsum;
   wz /= wsum;
-  const norm = Math.hypot(wx, wy, wz) || 1;
+  const meanResultantLength = Math.min(1, Math.hypot(wx, wy, wz));
+  const norm = meanResultantLength || 1;
   const com = [wx / norm, wy / norm, wz / norm];
-
-  let varianceRad2 = 0;
-  for (const { w, u } of weighted) {
-    const theta = angleBetween(u, com);
-    varianceRad2 += w * theta * theta;
-  }
-  varianceRad2 /= wsum;
-  const rmsRad = Math.sqrt(varianceRad2);
-  const rmsDeg = (rmsRad * 180) / Math.PI;
+  const spreadRad = Math.acos(meanResultantLength);
+  const spreadDeg = (spreadRad * 180) / Math.PI;
 
   return {
     lat: (Math.asin(com[2]) * 180) / Math.PI,
     lng: (Math.atan2(com[1], com[0]) * 180) / Math.PI,
     totalMonths: wsum,
-    varianceRad2,
-    rmsSpreadDeg: rmsDeg,
-    rmsSpreadRad: rmsRad,
+    meanResultantLength,
+    sphericalVariance: 1 - meanResultantLength,
+    spreadDeg,
+    spreadRad,
   };
 }

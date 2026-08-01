@@ -35,7 +35,7 @@ let pendingClick = null;
 let selectedSearch = null;
 /** @type {GeoHit | null} */
 let moveSearch = null;
-/** @type {{ lat: number, lng: number, totalMonths: number } | null} */
+/** @type {{ lat: number, lng: number, totalMonths: number, spreadDeg?: number, spreadRad?: number } | null} */
 let centreOfMass = null;
 /** @type {{ name: string, label: string } | null} */
 let comSettlement = null;
@@ -411,7 +411,7 @@ function upsertComAnnotation() {
     comSettlement?.name ||
     "Finding nearest settlement…";
   const coords = `${centreOfMass.lat.toFixed(3)}°, ${centreOfMass.lng.toFixed(3)}°`;
-  const spread = `Spread ${formatSpread(centreOfMass.rmsSpreadDeg)} RMS`;
+  const spread = `Spread ${formatSpread(centreOfMass.spreadDeg)}`;
 
   const el = document.createElement("div");
   el.className = "com-annotation";
@@ -434,13 +434,13 @@ function upsertComAnnotation() {
 }
 
 function spreadRingFeature() {
-  if (mode !== "view" || !centreOfMass || !(centreOfMass.rmsSpreadRad > 1e-4)) {
+  if (mode !== "view" || !centreOfMass || !(centreOfMass.spreadRad > 1e-4)) {
     return { type: "FeatureCollection", features: [] };
   }
   const ring = angularCircle(
     centreOfMass.lat,
     centreOfMass.lng,
-    centreOfMass.rmsSpreadRad
+    centreOfMass.spreadRad
   );
   if (ring.length < 4) return { type: "FeatureCollection", features: [] };
   return {
@@ -500,8 +500,8 @@ function renderComCard() {
   els.comCard.hidden = false;
   els.comCoords.textContent = `${centreOfMass.lat.toFixed(3)}°, ${centreOfMass.lng.toFixed(3)}°`;
   els.comSpread.textContent = `Time-weighted spread: ${formatSpread(
-    centreOfMass.rmsSpreadDeg
-  )} RMS`;
+    centreOfMass.spreadDeg
+  )}`;
   els.comMeta.textContent = `Weighted by ${formatDuration(
     centreOfMass.totalMonths
   )} across ${places.length} entr${places.length === 1 ? "y" : "ies"}`;

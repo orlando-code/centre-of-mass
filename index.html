@@ -28,15 +28,7 @@
         </p>
       </div>
       <div class="mode-actions">
-        <a class="site-back-link" href="https://orlando-codes.com/">← Main site</a>
-        <div class="mode-actions-row">
-          <button id="btn-done" class="btn-secondary" type="button">
-            Reveal centre of mass
-          </button>
-          <button id="btn-add-more" class="btn-ghost" type="button" hidden>
-            Add additional points?
-          </button>
-        </div>
+        <a class="site-back-link" href="https://orlando-codes.com/">← Orlando's site</a>
       </div>
     </header>
 
@@ -88,10 +80,23 @@
           </table>
         </div>
 
+        <div class="places-total" id="places-total" hidden>
+          <span class="places-total-label">Total time</span>
+          <span class="places-total-value" id="places-total-value">–</span>
+        </div>
+
         <div class="panel-footer">
-          <button id="btn-export" class="btn-ghost" type="button">Download JSON</button>
+          <button id="btn-export" class="btn-ghost" type="button">Download points JSON</button>
           <button id="btn-clear" class="btn-danger-solid" type="button">Clear all points</button>
-          <button id="btn-link" class="btn-ghost" type="button">More information</button>
+          <button id="btn-link" class="btn-ghost" type="button">More info</button>
+        </div>
+        <div class="panel-footer panel-footer-reveal">
+          <button id="btn-done" class="btn-secondary btn-block" type="button">
+            Reveal centre of mass
+          </button>
+          <button id="btn-add-more" class="btn-ghost btn-block" type="button" hidden>
+            Add additional points?
+          </button>
         </div>
       </aside>
 

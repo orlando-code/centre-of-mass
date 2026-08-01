@@ -5,6 +5,7 @@ import {
   computeCentreOfMass,
   formatDuration,
   formatPlaceDuration,
+  formatPlacesTotal,
   formatSpread,
   normalizePlace,
   validatePlaceDuration,
@@ -75,6 +76,8 @@ const els = {
   comCoords: $("com-coords"),
   comSpread: $("com-spread"),
   comMeta: $("com-meta"),
+  placesTotal: $("places-total"),
+  placesTotalValue: $("places-total-value"),
 };
 
 function uid() {
@@ -128,7 +131,7 @@ function createDurationWheels(container, idPrefix) {
     const select = document.createElement("select");
     select.className = "duration-wheel";
     select.id = `${idPrefix}-${part}`;
-    select.size = 5;
+    select.size = 4;
     select.setAttribute("aria-label", label);
     fillWheelOptions(select, WHEEL_MAX[part]);
     select.value = "0";
@@ -156,7 +159,9 @@ function createDurationWheels(container, idPrefix) {
       selects.days.value = String(next.days);
       for (const sel of Object.values(selects)) {
         const opt = sel.selectedOptions[0];
-        opt?.scrollIntoView({ block: "center" });
+        if (!opt) continue;
+        // scrollIntoView also scrolls parent frames when this app is embedded.
+        sel.scrollTop = opt.offsetTop - (sel.clientHeight - opt.offsetHeight) / 2;
       }
     },
     reset() {
@@ -275,11 +280,18 @@ els.clickMove.addEventListener("input", () => {
 });
 
 /* ---------- Table / places ---------- */
+function renderPlacesTotal() {
+  const hasPlaces = places.length > 0;
+  els.placesTotal.hidden = !hasPlaces;
+  els.placesTotalValue.textContent = hasPlaces ? formatPlacesTotal(places) : "–";
+}
+
 function renderTable() {
   els.body.innerHTML = "";
   if (!places.length) {
     els.body.innerHTML =
       `<tr><td colspan="3" style="color: var(--muted)">No places yet – search above or click the map.</td></tr>`;
+    renderPlacesTotal();
     return;
   }
 
@@ -300,6 +312,7 @@ function renderTable() {
     `;
     els.body.appendChild(tr);
   }
+  renderPlacesTotal();
 }
 
 function flyToPlace(place, minZoom = 5) {
@@ -595,12 +608,25 @@ const map = new maplibregl.Map({
   zoom: 1.6,
   maxZoom: MAX_ZOOM,
   projection: { type: "mercator" },
+  attributionControl: false,
 });
 
 map.addControl(
-  new maplibregl.NavigationControl({ visualizePitch: true }),
+  new maplibregl.AttributionControl({ compact: true}),
+  "bottom-right"
+)
+
+map.addControl(
+  new maplibregl.NavigationControl({ visualizePitch: false }),
   "top-right"
 );
+
+const mapEl = document.getElementById("map");
+if (mapEl && typeof ResizeObserver !== "undefined") {
+  new ResizeObserver(() => {
+    map.resize();
+  }).observe(mapEl);
+}
 
 map.on("load", () => {
   mapReady = true;

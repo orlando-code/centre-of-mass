@@ -41,14 +41,41 @@ export function formatDuration(months) {
   return `${years} year${years === 1 ? "" : "s"}`;
 }
 
-export function formatPlaceDuration(place) {
-  const { years, months, days } = clampDurationParts(place);
+export function formatDurationParts(parts) {
+  const years = Math.max(0, Math.round(Number(parts.years) || 0));
+  const months = Math.max(0, Math.round(Number(parts.months) || 0));
+  const days = Math.max(0, Math.round(Number(parts.days) || 0));
   if (years + months + days <= 0) return "–";
-  const parts = [];
-  if (years) parts.push(`${years}y`);
-  if (months) parts.push(`${months}m`);
-  if (days) parts.push(`${days}d`);
-  return parts.join(" ");
+  const out = [];
+  if (years) out.push(`${years}y`);
+  if (months) out.push(`${months}m`);
+  if (days) out.push(`${days}d`);
+  return out.join(" ");
+}
+
+export function formatPlaceDuration(place) {
+  return formatDurationParts(clampDurationParts(place));
+}
+
+/** Sum entered durations into uncapped years / months / days. */
+export function formatPlacesTotal(places) {
+  const totalDays = places.reduce((sum, p) => sum + durationDays(p), 0);
+  if (!(totalDays > 0)) return "–";
+  let rem = totalDays;
+  let years = Math.floor(rem / DAYS_PER_YEAR);
+  rem -= years * DAYS_PER_YEAR;
+  let months = Math.floor(rem / DAYS_PER_MONTH);
+  rem -= months * DAYS_PER_MONTH;
+  let days = Math.max(0, Math.round(rem));
+  if (days >= Math.round(DAYS_PER_MONTH)) {
+    days = 0;
+    months += 1;
+  }
+  if (months >= 12) {
+    months -= 12;
+    years += 1;
+  }
+  return formatDurationParts({ years, months, days });
 }
 
 /** @returns {string | null} error message */
